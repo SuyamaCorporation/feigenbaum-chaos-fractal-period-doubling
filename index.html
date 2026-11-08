@@ -1,0 +1,178 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ファイゲンバウム定数・カオス周期倍加フラクタルダイアグラム</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<style>
+  canvas { display: block; }
+  body { background: #0a0a0a; }
+</style>
+</head>
+<body class="min-h-screen text-white p-4">
+<div class="max-w-5xl mx-auto">
+  <h1 class="text-2xl font-bold mb-1 text-cyan-300">ファイゲンバウム定数・カオス分岐図</h1>
+  <p class="text-gray-400 text-sm mb-4">ロジスティックマップ x<sub>n+1</sub> = r·x<sub>n</sub>·(1−x<sub>n</sub>) の分岐ダイアグラム</p>
+
+  <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+    <div class="bg-gray-800 rounded-lg p-3">
+      <label class="block text-xs text-gray-400 mb-1" for="rMin">r 最小値: <span id="rMinVal" class="text-yellow-300">2.5</span></label>
+      <input type="range" id="rMin" min="2.5" max="3.9" step="0.01" value="2.5" class="w-full accent-cyan-400" aria-label="r最小値">
+    </div>
+    <div class="bg-gray-800 rounded-lg p-3">
+      <label class="block text-xs text-gray-400 mb-1" for="rMax">r 最大値: <span id="rMaxVal" class="text-yellow-300">4.0</span></label>
+      <input type="range" id="rMax" min="2.6" max="4.0" step="0.01" value="4.0" class="w-full accent-cyan-400" aria-label="r最大値">
+    </div>
+    <div class="bg-gray-800 rounded-lg p-3">
+      <label class="block text-xs text-gray-400 mb-1" for="colorMap">カラーマップ</label>
+      <select id="colorMap" class="w-full bg-gray-700 text-white rounded px-2 py-1 text-sm" aria-label="カラーマップ選択">
+        <option value="red">レッド</option>
+        <option value="blue" selected>ブルー</option>
+        <option value="green">グリーン</option>
+      </select>
+    </div>
+  </div>
+
+  <div class="bg-gray-900 rounded-xl overflow-hidden border border-gray-700 relative">
+    <canvas id="canvas" width="900" height="500" class="w-full" aria-label="分岐図キャンバス"></canvas>
+    <div id="tooltip" class="absolute text-xs bg-black bg-opacity-80 text-cyan-200 px-2 py-1 rounded pointer-events-none hidden"></div>
+  </div>
+
+  <div class="mt-3 grid grid-cols-2 md:grid-cols-4 gap-3 text-sm">
+    <div class="bg-gray-800 rounded p-2 text-center">
+      <div class="text-gray-400 text-xs">ファイゲンバウム定数 δ</div>
+      <div class="text-cyan-300 font-mono">4.6692016091...</div>
+    </div>
+    <div class="bg-gray-800 rounded p-2 text-center">
+      <div class="text-gray-400 text-xs">最初の分岐 r₁</div>
+      <div class="text-yellow-300 font-mono">3.0000</div>
+    </div>
+    <div class="bg-gray-800 rounded p-2 text-center">
+      <div class="text-gray-400 text-xs">カオス発生 r∞</div>
+      <div class="text-red-300 font-mono">3.5699...</div>
+    </div>
+    <div class="bg-gray-800 rounded p-2 text-center">
+      <div class="text-gray-400 text-xs">描画点数</div>
+      <div class="text-green-300 font-mono" id="pointCount">-</div>
+    </div>
+  </div>
+
+  <div class="mt-3 flex gap-3">
+    <button id="btnDraw" class="bg-cyan-600 hover:bg-cyan-500 text-white px-4 py-2 rounded font-semibold text-sm transition" aria-label="再描画">再描画</button>
+    <button id="btnReset" class="bg-gray-600 hover:bg-gray-500 text-white px-4 py-2 rounded font-semibold text-sm transition" aria-label="リセット">全体表示にリセット</button>
+  </div>
+</div>
+
+<script>
+(function() {
+  const canvas = document.getElementById('canvas');
+  const ctx = canvas.getContext('2d');
+  const tooltip = document.getElementById('tooltip');
+
+  function getColor(map, t) {
+    const v = Math.floor(t * 255);
+    if (map === 'red') return `rgb(${v},${Math.floor(v*0.3)},${Math.floor(v*0.1)})`;
+    if (map === 'green') return `rgb(${Math.floor(v*0.1)},${v},${Math.floor(v*0.3)})`;
+    return `rgb(${Math.floor(v*0.1)},${Math.floor(v*0.5)},${v})`;
+  }
+
+  function draw() {
+    const W = canvas.width;
+    const H = canvas.height;
+    const rMin = parseFloat(document.getElementById('rMin').value);
+    const rMax = parseFloat(document.getElementById('rMax').value);
+    if (rMin >= rMax) return;
+    const colorMap = document.getElementById('colorMap').value;
+
+    ctx.fillStyle = '#0a0a0a';
+    ctx.fillRect(0, 0, W, H);
+
+    const steps = 500;
+    const discard = 300;
+    let totalPoints = 0;
+
+    for (let px = 0; px < W; px++) {
+      const r = rMin + (rMax - rMin) * px / W;
+      let x = 0.5;
+      for (let i = 0; i < discard; i++) x = r * x * (1 - x);
+      for (let i = 0; i < steps; i++) {
+        x = r * x * (1 - x);
+        const py = H - Math.floor(x * H);
+        const t = i / steps;
+        ctx.fillStyle = getColor(colorMap, t);
+        ctx.fillRect(px, Math.max(0, Math.min(H-1, py)), 1, 1);
+        totalPoints++;
+      }
+    }
+
+    ctx.strokeStyle = 'rgba(255,255,100,0.4)';
+    ctx.setLineDash([4,4]);
+    ctx.lineWidth = 1;
+    const bifPoints = [3.0, 3.449, 3.544, 3.5644, 3.5688, 3.56994];
+    bifPoints.forEach(r => {
+      if (r >= rMin && r <= rMax) {
+        const px = Math.floor((r - rMin) / (rMax - rMin) * W);
+        ctx.beginPath();
+        ctx.moveTo(px, 0);
+        ctx.lineTo(px, H);
+        ctx.stroke();
+      }
+    });
+    ctx.setLineDash([]);
+
+    ctx.fillStyle = 'rgba(255,255,100,0.9)';
+    ctx.font = '11px monospace';
+    if (3.0 >= rMin && 3.0 <= rMax) {
+      const px = Math.floor((3.0 - rMin) / (rMax - rMin) * W);
+      ctx.fillText('r=3.0', px + 2, 14);
+    }
+    if (3.5699 >= rMin && 3.5699 <= rMax) {
+      const px = Math.floor((3.5699 - rMin) / (rMax - rMin) * W);
+      ctx.fillText('r∞', px + 2, 14);
+    }
+
+    ctx.fillStyle = 'rgba(255,255,255,0.3)';
+    ctx.font = '10px sans-serif';
+    ctx.fillText(`r: ${rMin.toFixed(2)}`, 4, H - 4);
+    ctx.fillText(`r: ${rMax.toFixed(2)}`, W - 50, H - 4);
+
+    document.getElementById('pointCount').textContent = totalPoints.toLocaleString();
+  }
+
+  document.getElementById('rMin').addEventListener('input', function() {
+    document.getElementById('rMinVal').textContent = parseFloat(this.value).toFixed(2);
+  });
+  document.getElementById('rMax').addEventListener('input', function() {
+    document.getElementById('rMaxVal').textContent = parseFloat(this.value).toFixed(2);
+  });
+  document.getElementById('btnDraw').addEventListener('click', draw);
+  document.getElementById('btnReset').addEventListener('click', function() {
+    document.getElementById('rMin').value = 2.5;
+    document.getElementById('rMax').value = 4.0;
+    document.getElementById('rMinVal').textContent = '2.5';
+    document.getElementById('rMaxVal').textContent = '4.0';
+    draw();
+  });
+
+  canvas.addEventListener('mousemove', function(e) {
+    const rect = canvas.getBoundingClientRect();
+    const scaleX = canvas.width / rect.width;
+    const px = (e.clientX - rect.left) * scaleX;
+    const rMin = parseFloat(document.getElementById('rMin').value);
+    const rMax = parseFloat(document.getElementById('rMax').value);
+    const r = rMin + (rMax - rMin) * px / canvas.width;
+    tooltip.style.left = (e.clientX - rect.left + 10) + 'px';
+    tooltip.style.top = (e.clientY - rect.top - 20) + 'px';
+    tooltip.textContent = `r = ${r.toFixed(4)}`;
+    tooltip.classList.remove('hidden');
+  });
+  canvas.addEventListener('mouseleave', function() {
+    tooltip.classList.add('hidden');
+  });
+
+  draw();
+})();
+</script>
+</body>
+</html>
